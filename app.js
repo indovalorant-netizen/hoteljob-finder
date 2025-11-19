@@ -3,31 +3,49 @@ const tg = window.Telegram.WebApp;
 tg.expand(); // Expand to full screen
 tg.enableClosingConfirmation(); // Prevent accidental close
 
-// Sample job data (nanti ganti dengan API dari GCP)
+// Sample job data (TANPA GAJI)
 const sampleJobs = [
     {
         id: 1,
         position: "Front Office Staff",
         hotel: "Hotel Grand Bali",
-        location: "Bali",
-        salary: "Rp 4.5 - 5.5 juta",
+        location: "bali",
         type: "Full-time"
     },
     {
         id: 2,
         position: "Housekeeping Supervisor",
         hotel: "Resort Sanur Beach",
-        location: "Bali", 
-        salary: "Rp 5 - 6 juta",
+        location: "bali",
         type: "Full-time"
     },
     {
         id: 3,
         position: "F&B Service",
         hotel: "Hotel Jakarta Central",
-        location: "Jakarta",
-        salary: "Rp 4 - 5 juta",
+        location: "jakarta",
         type: "Full-time"
+    },
+    {
+        id: 4,
+        position: "Executive Chef",
+        hotel: "Luxury Resort Ubud",
+        location: "bali", 
+        type: "Full-time"
+    },
+    {
+        id: 5,
+        position: "Bellboy",
+        hotel: "Hotel Surabaya Plaza",
+        location: "surabaya",
+        type: "Full-time"
+    },
+    {
+        id: 6,
+        position: "Receptionist",
+        hotel: "Boutique Hotel Seminyak",
+        location: "bali",
+        type: "Part-time"
     }
 ];
 
@@ -48,8 +66,7 @@ function displayJobs(jobs) {
             <div class="job-title">${job.position}</div>
             <div class="job-meta">
                 🏨 ${job.hotel}<br>
-                📍 ${job.location} • ${job.type}<br>
-                💰 ${job.salary}
+                📍 ${job.location.charAt(0).toUpperCase() + job.location.slice(1)} • ${job.type}
             </div>
             <button class="apply-btn" onclick="applyJob(${job.id})">
                 Lamar Sekarang
@@ -78,33 +95,39 @@ function applyJob(jobId) {
             if (buttonId === 'apply') {
                 // Send application data to backend
                 sendApplication(jobId, user);
-                tg.showAlert(`Lamaran untuk ${job.position} berhasil dikirim!`);
+                tg.showAlert(`✅ Lamaran untuk ${job.position} berhasil dikirim! HRD akan menghubungi Anda via Telegram.`);
             }
         });
     } else {
-        // User not logged in
+        // User not logged in - should not happen in Mini App
         tg.showAlert('Silakan buka aplikasi ini melalui Telegram untuk melamar.');
     }
 }
 
 // Send application to backend
 function sendApplication(jobId, user) {
-    // Ini nanti akan connect ke backend GCP Anda
-    console.log('Application sent:', {
-        jobId: jobId,
-        userId: user.id,
-        userName: user.first_name,
-        userUsername: user.username
-    });
+    const job = sampleJobs.find(j => j.id === jobId);
     
     // Simpan di localStorage untuk sementara
     const applications = JSON.parse(localStorage.getItem('applications') || '[]');
     applications.push({
         jobId: jobId,
+        position: job.position,
+        hotel: job.hotel,
         userId: user.id,
+        userName: user.first_name || 'User',
+        userUsername: user.username || 'No username',
         timestamp: new Date().toISOString()
     });
     localStorage.setItem('applications', JSON.stringify(applications));
+    
+    // Log untuk debugging (nanti ganti dengan API call ke GCP)
+    console.log('Application submitted:', {
+        jobId: jobId,
+        position: job.position,
+        user: user.first_name,
+        username: user.username
+    });
 }
 
 // Filter jobs
@@ -119,7 +142,7 @@ function setupFilters() {
         const filtered = sampleJobs.filter(job => {
             const matchSearch = job.position.toLowerCase().includes(searchTerm) || 
                               job.hotel.toLowerCase().includes(searchTerm);
-            const matchLocation = !location || job.location.toLowerCase() === location;
+            const matchLocation = !location || job.location === location;
             
             return matchSearch && matchLocation;
         });
@@ -135,4 +158,16 @@ function setupFilters() {
 document.addEventListener('DOMContentLoaded', function() {
     displayJobs(sampleJobs);
     setupFilters();
+    
+    // Optional: Tampilkan welcome message
+    setTimeout(() => {
+        if (tg.initDataUnsafe.user) {
+            const user = tg.initDataUnsafe.user;
+            tg.showPopup({
+                title: 'Selamat Datang!',
+                message: `Hai ${user.first_name}! 👋 Temukan lowongan perhotelan terbaik di sini.`,
+                buttons: [{id: 'ok', type: 'default', text: 'Mulai Jelajah'}]
+            });
+        }
+    }, 1000);
 });
