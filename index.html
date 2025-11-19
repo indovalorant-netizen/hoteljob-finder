@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>HotelJob Finder</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏨 HotelJob Finder</h1>
+            <p>Temukan lowongan kerja perhotelan terbaru</p>
+        </header>
+        
+        <div class="search-section">
+            <input type="text" id="searchInput" placeholder="Cari posisi...">
+            <select id="locationFilter">
+                <option value="">Semua Lokasi</option>
+                <option value="bali">Bali</option>
+                <option value="jakarta">Jakarta</option>
+                <option value="surabaya">Surabaya</option>
+            </select>
+        </div>
+
+        <div id="jobsList" class="jobs-list">
+            <!-- Jobs will be loaded here by JavaScript -->
+        </div>
+
+        <div id="loading">Memuat lowongan...</div>
+    </div>
+    
+    <script src="app.js"></script>
+</body>
+</html>
