@@ -19,7 +19,7 @@ if (tg) {
     };
 }
 
-// Sample job data (TANPA GAJI)
+// Sample job data (TANPA GAJI) - Fallback jika backend offline
 const sampleJobs = [
     {
         id: 1,
@@ -47,15 +47,6 @@ const sampleJobs = [
         type: "Full-time",
         description: "Melayani tamu di restaurant, mengambil order, dan memastikan kepuasan tamu.",
         requirements: "Ramah, komunikatif, pengalaman F&B lebih diutamakan"
-    },
-    {
-        id: 4,
-        position: "Executive Chef",
-        hotel: "Luxury Resort Ubud",
-        location: "bali",
-        type: "Full-time", 
-        description: "Memimpin kitchen operation, menu planning, cost control, dan menjaga kualitas makanan.",
-        requirements: "Pengalaman min. 5 tahun sebagai Chef, certified culinary education"
     }
 ];
 
@@ -97,7 +88,10 @@ function formatLocation(loc) {
 
 // Show job details
 function showJobDetails(jobId) {
-    const job = sampleJobs.find(j => j.id === jobId);
+    const jobs = window.currentJobs || sampleJobs;
+    const job = jobs.find(j => j.id === jobId);
+    
+    if (!job) return;
     
     const detailsHTML = `
         <div class="job-details">
@@ -135,7 +129,7 @@ function showJobDetails(jobId) {
 
 // Show job list
 function showJobList() {
-    displayJobs(sampleJobs);
+    displayJobs(window.currentJobs || sampleJobs);
     if (tg?.BackButton) {
         tg.BackButton.hide();
     }
@@ -143,7 +137,10 @@ function showJobList() {
 
 // Apply job function
 function applyJob(jobId) {
-    const job = sampleJobs.find(j => j.id === jobId);
+    const jobs = window.currentJobs || sampleJobs;
+    const job = jobs.find(j => j.id === jobId);
+    
+    if (!job) return;
     
     if (tg?.initDataUnsafe?.user) {
         // User is logged in via Telegram
@@ -174,34 +171,81 @@ function applyJob(jobId) {
 }
 
 // Send application to backend
-function sendApplication(jobId, user) {
-    const job = sampleJobs.find(j => j.id === jobId);
+async function sendApplication(jobId, user) {
+    const jobs = window.currentJobs || sampleJobs;
+    const job = jobs.find(j => j.id === jobId);
     
-    // Simpan di localStorage untuk sementara
-    const applications = JSON.parse(localStorage.getItem('applications') || '[]');
-    const newApplication = {
-        jobId: jobId,
-        position: job.position,
-        hotel: job.hotel,
-        userId: user.id || 'unknown',
-        userName: user.first_name || 'User',
-        userUsername: user.username || 'No username',
-        timestamp: new Date().toISOString(),
-        status: 'pending'
-    };
-    
-    applications.push(newApplication);
-    localStorage.setItem('applications', JSON.stringify(applications));
-    
-    // Log untuk debugging
-    console.log('📨 Application submitted:', newApplication);
-    
-    // TODO: nanti ganti dengan API call ke backend GCP
-    // fetch('https://your-gcp-backend/api/apply', {
-    //     method: 'POST',
-    //     headers: { 'Content-Type': 'application/json' },
-    //     body: JSON.stringify(newApplication)
-    // });
+    try {
+        const response = await fetch('http://34.101.71.134:3000/api/applications', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                jobId: jobId,
+                userId: user.id.toString(),
+                userName: user.first_name + (user.last_name ? ' ' + user.last_name : ''),
+                userUsername: user.username || ''
+            })
+        });
+
+        const result = await response.json();
+        
+        if (result.success) {
+            console.log('✅ Application saved to backend:', result);
+            
+            // Juga simpan di localStorage sebagai backup
+            const applications = JSON.parse(localStorage.getItem('applications') || '[]');
+            applications.push({
+                jobId: jobId,
+                position: job.position,
+                hotel: job.hotel,
+                userId: user.id,
+                userName: user.first_name,
+                userUsername: user.username,
+                timestamp: new Date().toISOString(),
+                backendId: result.applicationId
+            });
+            localStorage.setItem('applications', JSON.stringify(applications));
+            
+        } else {
+            throw new Error(result.error);
+        }
+        
+    } catch (error) {
+        console.error('❌ Error sending to backend:', error);
+        
+        // Fallback: simpan di localStorage saja
+        const applications = JSON.parse(localStorage.getItem('applications') || '[]');
+        applications.push({
+            jobId: jobId,
+            position: job.position,
+            hotel: job.hotel,
+            userId: user.id,
+            userName: user.first_name,
+            userUsername: user.username,
+            timestamp: new Date().toISOString(),
+            error: 'Backend offline, saved locally'
+        });
+        localStorage.setItem('applications', JSON.stringify(applications));
+        
+        tg.showAlert('⚠️ Lamaran disimpan secara offline. Akan sync ketika koneksi normal.');
+    }
+}
+
+// Load jobs from backend
+async function loadJobsFromBackend() {
+    try {
+        const response = await fetch('http://34.101.71.134:3000/api/jobs');
+        const jobs = await response.json();
+        window.currentJobs = jobs; // Simpan jobs yang dari backend
+        displayJobs(jobs);
+        console.log('✅ Loaded jobs from backend');
+    } catch (error) {
+        console.log('❌ Using sample jobs (backend offline)');
+        window.currentJobs = sampleJobs;
+        displayJobs(sampleJobs);
+    }
 }
 
 // Filter jobs
@@ -213,7 +257,8 @@ function setupFilters() {
         const searchTerm = searchInput.value.toLowerCase();
         const location = locationFilter.value;
         
-        const filtered = sampleJobs.filter(job => {
+        const jobs = window.currentJobs || sampleJobs;
+        const filtered = jobs.filter(job => {
             const matchSearch = job.position.toLowerCase().includes(searchTerm) || 
                               job.hotel.toLowerCase().includes(searchTerm);
             const matchLocation = !location || job.location === location;
@@ -230,7 +275,7 @@ function setupFilters() {
 
 // Initialize app
 document.addEventListener('DOMContentLoaded', function() {
-    displayJobs(sampleJobs);
+    loadJobsFromBackend(); // Load dari backend
     setupFilters();
     
     // Welcome message
